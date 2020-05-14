@@ -1,0 +1,86 @@
+---
+title: "Analysis: Activity Monitoring Data from Wearable Devices"
+author: "Nitin Dwivedi"
+date: "May 14, 2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+This assignment makes use of data from a personal activity monitoring device. This device collects data at 5 minute intervals through out the day. The data consists of two months of data from an anonymous individual collected during the months of October and November, 2012 and include the number of steps taken in 5 minute intervals each day.
+
+
+## Loading the necessary libraries
+```{r, message=FALSE, warning = FALSE}
+library(dplyr)
+library(ggplot2)
+```
+
+## Loading and preprocessing the data
+```{r, message=FALSE, warning = FALSE}
+unzip("activity.zip")
+data<-read.csv("activity.csv")
+datadf<-data.frame(data)
+```
+
+## Histogram of total number of steps taken each day
+```{r}
+stepsperday<-summarize(group_by(datadf,date),sum(steps))
+colnames(stepsperday)<-c("Date","Steps")
+hist(stepsperday$Steps,xlab="Total steps taken each day",main="Histogram for total steps taken each day",breaks = 30,col="aquamarine")
+```
+
+## What is mean total number of steps taken per day?
+```{r}
+mean(stepsperday$Steps,na.rm = TRUE)
+median(stepsperday$Steps,na.rm = TRUE)
+```
+
+## What is the average daily activity pattern?
+```{r}
+averageintervalsteps<-summarize(group_by(datadf,interval),mean(steps,na.rm = TRUE))
+colnames(averageintervalsteps)<-c("Interval","AverageSteps")
+ggplot(averageintervalsteps,aes(x=Interval,y=AverageSteps))+geom_line()+labs(x="Interval",y="Average Steps",title="Time series plot for average number of steps taken")
+```
+
+## The 5-minute interval that, on average, contains the maximum number of steps
+```{r}
+averageintervalsteps[averageintervalsteps$AverageSteps==max(averageintervalsteps$AverageSteps),]
+```
+
+## Imputing missing values 
+
+There are a number of days/intervals where there are missing values (coded as \color{red}{\verb|NA|}NA). The presence of missing days may introduce bias into some calculations or summaries of the data.
+
+```{r}
+## Replace the missing values for 'steps' with the average value of steps for a particular time interval
+missingvalues<-sum(is.na(datadf))
+replacewithmean<-function(x) replace(x,is.na(x),mean(x,na.rm = TRUE))
+newdatadf<-datadf %>% group_by(interval) %>% mutate(steps=replacewithmean(steps))
+head(newdatadf)
+```
+
+## Histogram of the total number of steps taken each day after missing values are imputed
+
+A histogram of the total number of steps taken each day and Calculate and report the mean and median total number of steps taken per day.
+```{r}
+newstepsperday<-summarize(group_by(newdatadf,date),sum(steps))
+colnames(newstepsperday)<-c("Date","Steps")
+hist(newstepsperday$Steps,xlab="Total steps taken each day",main="Histogram for total steps taken each day",breaks = 30,col="aquamarine")
+mean(newstepsperday$Steps)
+median(newstepsperday$Steps)
+```
+
+## Are there differences in activity patterns between weekdays and weekends?
+A panel plot containing a time series plot (i.e. \color{red}{\verb|type = "l"|}type = "l") of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all weekday days or weekend days (y-axis).
+
+```{r}
+newdatadf$date<-as.Date(newdatadf$date)
+newdatadf$weekday<-weekdays(newdatadf$date)
+newdatadf$weekend<-ifelse(newdatadf$weekday=="Saturday" | newdatadf$weekday=="Sunday", "Weekend", "Weekday")
+weekendweekday<-aggregate(newdatadf$steps,by=list(newdatadf$weekend,newdatadf$interval),mean)
+names(weekendweekday)<-c("Weekend","Interval","Steps")
+ggplot(weekendweekday,aes(x=Interval,y=Steps,color=Weekend))+geom_line()+facet_grid(Weekend ~.)+xlab("Interval")+ylab("Mean of Steps")+ggtitle("Comparison of average number of steps on Weekdays and Weekends")
+```
